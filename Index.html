@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Fix Status Akun</title>
+    <style>
+        body { background: #0f172a; color: white; font-family: sans-serif; padding: 20px; text-align: center; }
+        button { padding: 10px 20px; background: #22c55e; color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; font-size: 1rem; }
+        .log { margin-top: 20px; text-align: left; background: #000; color: #0f0; padding: 10px; height: 200px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h2>Pembersih Data Akun</h2>
+    <p>Klik tombol di bawah untuk memaksa semua akun menjadi status "active".</p>
+    <button onclick="window.fixData()">PERBAIKI SEMUA DATA</button>
+    <div id="log" class="log">Menunggu...</div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getDatabase, ref, get, update } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCul8W17gn3ckp1_B6JFfhqYOPfexXilrY",
+            authDomain: "fca1a.firebaseapp.com",
+            databaseURL: "https://fireba-fca1a-default-rtdb.asia-southeast1.firebasedatabase.app", // PENTING: URL Database Realtime
+            projectId: "fireba-fca1a",
+            storageBucket: "fireba-fca1a.firebasestorage.app",
+            messagingSenderId: "507496403967",
+            appId: "1:507496403967:web:9fe048882aeffd84ae4dca"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const logDiv = document.getElementById('log');
+
+        function log(msg) {
+            logDiv.innerHTML += `<div>> ${msg}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        window.fixData = async () => {
+            log("Memulai perbaikan...");
+            try {
+                const snapshot = await get(ref(db, 'accounts'));
+                if (!snapshot.exists()) {
+                    log("Data accounts kosong!");
+                    return;
+                }
+
+                const allData = snapshot.val();
+                let count = 0;
+
+                for (const key in allData) {
+                    // Update status menjadi 'active' (huruf kecil)
+                    await update(ref(db, 'accounts/' + key), { status: 'active' });
+                    count++;
+                    log(`Update akun ke-${count}: ${allData[key].email}`);
+                }
+                
+                log(`✅ SELESAI! ${count} akun berhasil diperbaiki.`);
+                alert("Selesai! Coba redeem ulang.");
+
+            } catch (e) {
+                log(`Error: ${e.message}`);
+            }
+        };
+    </script>
+</body>
+</html>
