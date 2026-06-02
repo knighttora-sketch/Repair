@@ -2,25 +2,46 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Cek Struktur Database</title>
+    <title>Import Data (Fixed Path)</title>
     <style>
-        body { background: #111; color: #eee; font-family: monospace; padding: 20px; }
-        button { padding: 10px 20px; background: #6366f1; color: white; border: none; cursor: pointer; margin-bottom: 20px; }
-        #output { white-space: pre-wrap; background: #222; padding: 15px; border-radius: 5px; border: 1px solid #444; max-height: 80vh; overflow: auto; }
+        :root { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --primary: #6366f1; }
+        body { background: var(--bg); color: var(--text); font-family: sans-serif; padding: 40px 20px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 600px; background: var(--card); padding: 2rem; border-radius: 12px; border: 1px solid #334155; }
+        h2 { color: var(--primary); margin-bottom: 20px; }
+        .section { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155; }
+        label { display: block; margin-bottom: 8px; color: #94a3b8; }
+        textarea { width: 100%; height: 120px; background: #000; border: 1px solid #475569; color: #0f0; padding: 10px; font-family: monospace; border-radius: 6px; }
+        button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        button:hover { opacity: 0.9; }
+        .log { background: black; color: yellow; padding: 10px; margin-top: 20px; height: 150px; overflow-y: auto; border: 1px solid #333; border-radius: 6px; font-size: 0.8rem; }
     </style>
 </head>
 <body>
-    <h2>Pendeteksi Akar Database</h2>
-    <p>Tombol ini akan mencetak SEGALA SESUATU yang ada di root database Anda.</p>
-    <button onclick="window.scanRoot()">SCAN SEMUA DATA</button>
-    
-    <div id="output">Menunggu scan...</div>
+
+    <div class="container">
+        <h2>Import Stok (Realtime DB)</h2>
+
+        <!-- Import KODE -->
+        <div class="section">
+            <label>1. Input Kode Redeem (JSON)</label>
+            <textarea id="input-codes" placeholder='[{"code": "VIP1", "status": "active"}, {"code": "VIP2", "status": "active"}]'></textarea>
+            <button onclick="window.importCodes()">Upload Kode</button>
+        </div>
+
+        <!-- Import AKUN -->
+        <div class="section">
+            <label>2. Input Akun (JSON)</label>
+            <textarea id="input-accounts" placeholder='[{"email": "user1@gmail.com", "password": "pass", "status": "active"}]'></textarea>
+            <button onclick="window.importAccounts()">Upload Akun</button>
+        </div>
+
+        <div id="log" class="log">Menunggu aksi...</div>
+    </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-        import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+        import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
 
-        // ISI CONFIG ANDA
         const firebaseConfig = {
             apiKey: "AIzaSyCul8W17gn3ckp1_B6JFfhqYOPfexXilrY",
             authDomain: "fca1a.firebaseapp.com",
@@ -33,44 +54,51 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
+        const logDiv = document.getElementById('log');
 
-        window.scanRoot = async () => {
-            const out = document.getElementById('output');
-            out.innerText = "Sedang scanning root database...\n";
+        function log(msg) {
+            logDiv.innerHTML += `<div>> ${msg}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
 
+        // Import Kode -> Masuk ke 'codes'
+        window.importCodes = async () => {
+            const val = document.getElementById('input-codes').value;
+            if(!val) return log("Error: JSON kosong");
             try {
-                // Kita baca langsung dari ROOT (tanpa path)
-                const snapshot = await get(ref(db));
+                const data = JSON.parse(val);
+                if(!Array.isArray(data)) throw "Format harus Array";
                 
-                if (snapshot.exists()) {
-                    const data = snapshot.val();
-                    
-                    // Cetak strukturnya agar terlihat seperti pohon
-                    out.innerText += JSON.stringify(data, null, 2);
-                    
-                    // Analisa sederhana
-                    out.innerText += "\n\n--- ANALISIS ---\n";
-                    if (data.accounts) {
-                        out.innerText += "✅ Node 'accounts' DITEMUKAN.\n";
-                        const keys = Object.keys(data.accounts);
-                        out.innerText += `   Isi ada: ${keys.length} item.\n`;
-                        if (keys.length > 0) {
-                            const firstKey = keys[0];
-                            out.innerText += `   Contoh data pertama: ${JSON.stringify(data.accounts[firstKey])}\n`;
-                        }
-                    } else {
-                        out.innerText += "❌ Node 'accounts' TIDAK DITEMUKAN.\n";
-                        out.innerText += "   Apakah Anda menamainya 'account' (tanpa s) atau nama lain?\n";
-                        out.innerText += "   Nama node yang ada di database:\n";
-                        Object.keys(data).forEach(k => out.innerText += `   - ${k}\n`);
-                    }
-
-                } else {
-                    out.innerText = "Database BENAR-BENAR KOSONG (Null).";
+                let count = 0;
+                for(const item of data) {
+                    if(!item.code || !item.status) continue;
+                    // Push ke node 'codes'
+                    await push(ref(db, 'codes'), item);
+                    count++;
                 }
-            } catch (e) {
-                out.innerText = `ERROR: ${e.message}\n\nPastikan Database URL di config benar dan Rules allow read: true`;
-            }
+                log(`✅ Sukses upload ${count} Kode Redeem.`);
+                document.getElementById('input-codes').value = '';
+            } catch(e) { log(`❌ Error: ${e.message}`); }
+        };
+
+        // Import Akun -> Masuk ke 'codes/accounts'
+        window.importAccounts = async () => {
+            const val = document.getElementById('input-accounts').value;
+            if(!val) return log("Error: JSON kosong");
+            try {
+                const data = JSON.parse(val);
+                if(!Array.isArray(data)) throw "Format harus Array";
+                
+                let count = 0;
+                for(const item of data) {
+                    if(!item.email || !item.password) continue;
+                    // Push ke node 'codes/accounts'
+                    await push(ref(db, 'codes/accounts'), item);
+                    count++;
+                }
+                log(`✅ Sukses upload ${count} Akun.`);
+                document.getElementById('input-accounts').value = '';
+            } catch(e) { log(`❌ Error: ${e.message}`); }
         };
     </script>
 </body>
