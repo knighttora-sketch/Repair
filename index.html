@@ -2,23 +2,25 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Fix Status Akun</title>
+    <title>Cek Struktur Database</title>
     <style>
-        body { background: #0f172a; color: white; font-family: sans-serif; padding: 20px; text-align: center; }
-        button { padding: 10px 20px; background: #22c55e; color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; font-size: 1rem; }
-        .log { margin-top: 20px; text-align: left; background: #000; color: #0f0; padding: 10px; height: 200px; overflow-y: auto; }
+        body { background: #111; color: #eee; font-family: monospace; padding: 20px; }
+        button { padding: 10px 20px; background: #6366f1; color: white; border: none; cursor: pointer; margin-bottom: 20px; }
+        #output { white-space: pre-wrap; background: #222; padding: 15px; border-radius: 5px; border: 1px solid #444; max-height: 80vh; overflow: auto; }
     </style>
 </head>
 <body>
-    <h2>Pembersih Data Akun</h2>
-    <p>Klik tombol di bawah untuk memaksa semua akun menjadi status "active".</p>
-    <button onclick="window.fixData()">PERBAIKI SEMUA DATA</button>
-    <div id="log" class="log">Menunggu...</div>
+    <h2>Pendeteksi Akar Database</h2>
+    <p>Tombol ini akan mencetak SEGALA SESUATU yang ada di root database Anda.</p>
+    <button onclick="window.scanRoot()">SCAN SEMUA DATA</button>
+    
+    <div id="output">Menunggu scan...</div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-        import { getDatabase, ref, get, update } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+        import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
 
+        // ISI CONFIG ANDA
         const firebaseConfig = {
             apiKey: "AIzaSyCul8W17gn3ckp1_B6JFfhqYOPfexXilrY",
             authDomain: "fca1a.firebaseapp.com",
@@ -31,37 +33,43 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
-        const logDiv = document.getElementById('log');
 
-        function log(msg) {
-            logDiv.innerHTML += `<div>> ${msg}</div>`;
-            logDiv.scrollTop = logDiv.scrollHeight;
-        }
+        window.scanRoot = async () => {
+            const out = document.getElementById('output');
+            out.innerText = "Sedang scanning root database...\n";
 
-        window.fixData = async () => {
-            log("Memulai perbaikan...");
             try {
-                const snapshot = await get(ref(db, 'accounts'));
-                if (!snapshot.exists()) {
-                    log("Data accounts kosong!");
-                    return;
-                }
-
-                const allData = snapshot.val();
-                let count = 0;
-
-                for (const key in allData) {
-                    // Update status menjadi 'active' (huruf kecil)
-                    await update(ref(db, 'accounts/' + key), { status: 'active' });
-                    count++;
-                    log(`Update akun ke-${count}: ${allData[key].email}`);
-                }
+                // Kita baca langsung dari ROOT (tanpa path)
+                const snapshot = await get(ref(db));
                 
-                log(`✅ SELESAI! ${count} akun berhasil diperbaiki.`);
-                alert("Selesai! Coba redeem ulang.");
+                if (snapshot.exists()) {
+                    const data = snapshot.val();
+                    
+                    // Cetak strukturnya agar terlihat seperti pohon
+                    out.innerText += JSON.stringify(data, null, 2);
+                    
+                    // Analisa sederhana
+                    out.innerText += "\n\n--- ANALISIS ---\n";
+                    if (data.accounts) {
+                        out.innerText += "✅ Node 'accounts' DITEMUKAN.\n";
+                        const keys = Object.keys(data.accounts);
+                        out.innerText += `   Isi ada: ${keys.length} item.\n`;
+                        if (keys.length > 0) {
+                            const firstKey = keys[0];
+                            out.innerText += `   Contoh data pertama: ${JSON.stringify(data.accounts[firstKey])}\n`;
+                        }
+                    } else {
+                        out.innerText += "❌ Node 'accounts' TIDAK DITEMUKAN.\n";
+                        out.innerText += "   Apakah Anda menamainya 'account' (tanpa s) atau nama lain?\n";
+                        out.innerText += "   Nama node yang ada di database:\n";
+                        Object.keys(data).forEach(k => out.innerText += `   - ${k}\n`);
+                    }
 
+                } else {
+                    out.innerText = "Database BENAR-BENAR KOSONG (Null).";
+                }
             } catch (e) {
-                log(`Error: ${e.message}`);
+                out.innerText = `ERROR: ${e.message}\n\nPastikan Database URL di config benar dan Rules allow read: true`;
             }
         };
     </script>
